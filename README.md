@@ -128,5 +128,5 @@ python triage/report_generator.py --input data/results/ --output reports/
 ---
 
 ## 🧾 License
-For academic and research use only.
-Do not use for real-world attack deployment or unauthorized testing of external APIs.
+This project is licensed under the MIT License.
+You are free to use, modify, and distribute this software in accordance with the terms of the license. See the LICENSE file for full details.
