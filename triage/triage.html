@@ -1,0 +1,665 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>LLM Fuzzing Triage Dashboard</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0f1419;
+            color: #e6edf3;
+            line-height: 1.6;
+        }
+        
+        .container {
+            max-width: 1400px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        header {
+            background: linear-gradient(135deg, #1f2937 0%, #111827 100%);
+            padding: 30px;
+            border-radius: 12px;
+            margin-bottom: 30px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.3);
+        }
+        
+        h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            background: linear-gradient(135deg, #60a5fa, #3b82f6);
+            -webkit-background-clip: text;
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            color: #9ca3af;
+            font-size: 1.1em;
+        }
+        
+        .stats-grid {
+            display: grid; 
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        
+        .stat-card {
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 10px;
+            border-left: 4px solid #3b82f6;
+        }
+        
+        .stat-card.unsafe {
+            border-left-color: #ef4444;
+        }
+        
+        .stat-card.suspicious {
+            border-left-color: #f59e0b;
+        }
+        
+        .stat-card.safe {
+            border-left-color: #10b981;
+        }
+        
+        .stat-value {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #9ca3af;
+            text-transform: uppercase;
+            font-size: 0.85em;
+            letter-spacing: 1px;
+        }
+        
+        .controls {
+            background: #1f2937;
+            padding: 20px;
+            border-radius: 10px;
+            margin-bottom: 20px;
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+            align-items: center;
+        }
+        
+        .control-group {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        label {
+            color: #9ca3af;
+            font-weight: 500;
+        }
+        
+        select, input[type="text"], input[type="file"] {
+            background: #374151;
+            border: 1px solid #4b5563;
+            color: #e6edf3;
+            padding: 8px 12px;
+            border-radius: 6px;
+            font-size: 0.95em;
+        }
+        
+        button {
+            background: #3b82f6;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            transition: all 0.2s;
+        }
+        
+        button:hover {
+            background: #2563eb;
+            transform: translateY(-1px);
+        }
+        
+        button.secondary {
+            background: #6b7280;
+        }
+        
+        button.secondary:hover {
+            background: #4b5563;
+        }
+        
+        .results-container {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+        }
+        
+        .result-card {
+            background: #1f2937;
+            border-radius: 10px;
+            padding: 20px;
+            border-left: 4px solid #3b82f6;
+            transition: all 0.2s;
+        }
+        
+        .result-card:hover {
+            box-shadow: 0 4px 12px rgba(0,0,0,0.4);
+            transform: translateX(2px);
+        }
+        
+        .result-card.unsafe {
+            border-left-color: #ef4444;
+            background: #2d1f1f;
+        }
+        
+        .result-card.suspicious {
+            border-left-color: #f59e0b;
+            background: #2d2719;
+        }
+        
+        .result-card.safe {
+            border-left-color: #10b981;
+        }
+        
+        .result-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: start;
+            margin-bottom: 15px;
+            flex-wrap: wrap;
+            gap: 10px;
+        }
+        
+        .result-meta {
+            display: flex;
+            gap: 15px;
+            flex-wrap: wrap;
+        }
+        
+        .badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 6px;
+            font-size: 0.85em;
+            font-weight: 600;
+            text-transform: uppercase;
+        }
+        
+        .badge.unsafe {
+            background: #ef4444;
+            color: white;
+        }
+        
+        .badge.suspicious {
+            background: #f59e0b;
+            color: white;
+        }
+        
+        .badge.safe {
+            background: #10b981;
+            color: white;
+        }
+        
+        .badge.severity {
+            background: #374151;
+            color: #e6edf3;
+        }
+        
+        .badge.model {
+            background: #4b5563;
+            color: #e6edf3;
+        }
+        
+        .badge.mutation {
+            background: #6366f1;
+            color: white;
+        }
+        
+        .prompt-section {
+            margin-bottom: 15px;
+        }
+        
+        .section-title {
+            color: #9ca3af;
+            font-size: 0.9em;
+            margin-bottom: 8px;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        .prompt-text {
+            background: #111827;
+            padding: 12px;
+            border-radius: 6px;
+            font-family: 'Courier New', monospace;
+            font-size: 0.9em;
+            white-space: pre-wrap;
+            word-break: break-word;
+            border: 1px solid #374151;
+        }
+        
+        .response-text {
+            background: #111827;
+            padding: 15px;
+            border-radius: 6px;
+            font-size: 0.95em;
+            line-height: 1.7;
+            border: 1px solid #374151;
+            max-height: 300px;
+            overflow-y: auto;
+        }
+        
+        .reasoning {
+            background: #374151;
+            padding: 12px;
+            border-radius: 6px;
+            font-size: 0.9em;
+            color: #d1d5db;
+            margin-top: 10px;
+            border-left: 3px solid #6366f1;
+        }
+        
+        .no-results {
+            text-align: center;
+            padding: 60px 20px;
+            color: #6b7280;
+        }
+        
+        .file-input-wrapper {
+            position: relative;
+            display: inline-block;
+        }
+        
+        input[type="file"] {
+            cursor: pointer;
+        }
+        
+        .export-buttons {
+            display: flex;
+            gap: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            h1 {
+                font-size: 1.8em;
+            }
+            
+            .controls {
+                flex-direction: column;
+                align-items: stretch;
+            }
+            
+            .control-group {
+                flex-direction: column;
+                align-items: stretch;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <h1>🔍 LLM Fuzzing Triage Dashboard</h1>
+            <p class="subtitle">Review and analyze prompt fuzzing results for safety vulnerabilities</p>
+        </header>
+        
+        <div class="stats-grid" id="statsGrid">
+            <div class="stat-card">
+                <div class="stat-value" id="totalTests">0</div>
+                <div class="stat-label">Total Tests</div>
+            </div>
+            <div class="stat-card unsafe">
+                <div class="stat-value" id="unsafeCount">0</div>
+                <div class="stat-label">Unsafe</div>
+            </div>
+            <div class="stat-card suspicious">
+                <div class="stat-value" id="suspiciousCount">0</div>
+                <div class="stat-label">Suspicious</div>
+            </div>
+            <div class="stat-card safe">
+                <div class="stat-value" id="safeCount">0</div>
+                <div class="stat-label">Safe</div>
+            </div>
+        </div>
+        
+        <div class="controls">
+            <div class="control-group">
+                <label>Load Results:</label>
+                <input type="file" id="fileInput" accept=".json">
+            </div>
+            
+            <div class="control-group">
+                <label>Filter by Label:</label>
+                <select id="labelFilter">
+                    <option value="all">All</option>
+                    <option value="unsafe">Unsafe Only</option>
+                    <option value="suspicious">Suspicious Only</option>
+                    <option value="safe">Safe Only</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Filter by Model:</label>
+                <select id="modelFilter">
+                    <option value="all">All Models</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>Search:</label>
+                <input type="text" id="searchInput" placeholder="Search prompts or responses...">
+            </div>
+            
+            <div class="control-group export-buttons">
+                <button onclick="exportFiltered('csv')" class="secondary">Export CSV</button>
+                <button onclick="exportFiltered('json')" class="secondary">Export JSON</button>
+            </div>
+        </div>
+        
+        <div class="results-container" id="resultsContainer">
+            <div class="no-results">
+                <p style="font-size: 1.2em; margin-bottom: 10px;">📁 No results loaded</p>
+                <p>Upload a JSON file from your fuzzing results to begin triage</p>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        window.allResults = [];
+        let filteredResults = [];
+        
+        // Load file
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    try {
+                        window.allResults = JSON.parse(e.target.result);
+                        updateStats();
+                        updateModelFilter();
+                        applyFilters();
+                    } catch (error) {
+                        alert('Error parsing JSON file: ' + error.message);
+                    }
+                };
+                reader.readAsText(file);
+            }
+        });
+        
+        // Update statistics
+        function updateStats() {
+            const total = window.allResults.length;
+            const unsafe = window.allResults.filter(r => r.safety_label === 'unsafe').length;
+            const suspicious = window.allResults.filter(r => r.safety_label === 'suspicious').length;
+            const safe = window.allResults.filter(r => r.safety_label === 'safe').length;
+            
+            document.getElementById('totalTests').textContent = total;
+            document.getElementById('unsafeCount').textContent = unsafe;
+            document.getElementById('suspiciousCount').textContent = suspicious;
+            document.getElementById('safeCount').textContent = safe;
+        }
+        
+        // Update model filter dropdown
+        function updateModelFilter() {
+            const models = [...new Set(window.allResults.map(r => r.model_name))];
+            const select = document.getElementById('modelFilter');
+            
+            // Clear existing options except "All Models"
+            select.innerHTML = '<option value="all">All Models</option>';
+            
+            models.forEach(model => {
+                const option = document.createElement('option');
+                option.value = model;
+                option.textContent = model;
+                select.appendChild(option);
+            });
+        }
+        
+        // Apply filters
+        function applyFilters() {
+            const labelFilter = document.getElementById('labelFilter').value;
+            const modelFilter = document.getElementById('modelFilter').value;
+            const searchTerm = document.getElementById('searchInput').value.toLowerCase();
+            
+            filteredResults = window.allResults.filter(result => {
+                // Label filter
+                if (labelFilter !== 'all' && result.safety_label !== labelFilter) {
+                    return false;
+                }
+                
+                // Model filter
+                if (modelFilter !== 'all' && result.model_name !== modelFilter) {
+                    return false;
+                }
+                
+                // Search filter
+                if (searchTerm) {
+                    const searchableText = [
+                        result.original_prompt,
+                        result.mutated_prompt,
+                        result.response_text,
+                        result.reasoning
+                    ].join(' ').toLowerCase();
+                    
+                    if (!searchableText.includes(searchTerm)) {
+                        return false;
+                    }
+                }
+                
+                return true;
+            });
+            
+            renderResults();
+        }
+        
+        // Render results
+        function renderResults() {
+            const container = document.getElementById('resultsContainer');
+            
+            if (filteredResults.length === 0) {
+                container.innerHTML = `
+                    <div class="no-results">
+                        <p style="font-size: 1.2em; margin-bottom: 10px;">🔍 No matching results</p>
+                        <p>Try adjusting your filters or search terms</p>
+                    </div>
+                `;
+                return;
+            }
+            
+            container.innerHTML = filteredResults.map(result => `
+                <div class="result-card ${result.safety_label}">
+                    <div class="result-header">
+                        <div class="result-meta">
+                            <span class="badge ${result.safety_label}">${result.safety_label}</span>
+                            <span class="badge severity">Severity: ${result.severity}/10</span>
+                            <span class="badge model">${result.model_name}</span>
+                            <span class="badge mutation">${result.mutation_type}</span>
+                        </div>
+                        <div style="color: #6b7280; font-size: 0.85em;">
+                            ${new Date(result.timestamp).toLocaleString()}
+                        </div>
+                    </div>
+                    
+                    <div class="prompt-section">
+                        <div class="section-title">Original Prompt</div>
+                        <div class="prompt-text">${escapeHtml(result.original_prompt)}</div>
+                    </div>
+                    
+                    <div class="prompt-section">
+                        <div class="section-title">Mutated Prompt</div>
+                        <div class="prompt-text">${escapeHtml(result.mutated_prompt)}</div>
+                    </div>
+                    
+                    <div class="prompt-section">
+                        <div class="section-title">Model Response</div>
+                        <div class="response-text">${escapeHtml(result.response_text)}</div>
+                    </div>
+                    
+                    <div class="reasoning">
+                        <strong>Detection Reasoning:</strong> ${escapeHtml(result.reasoning)}
+                    </div>
+                </div>
+            `).join('');
+        }
+        
+        // Export filtered results
+        function exportFiltered(format) {
+            if (filteredResults.length === 0) {
+                alert('No results to export');
+                return;
+            }
+            
+            const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+            
+            if (format === 'json') {
+                const dataStr = JSON.stringify(filteredResults, null, 2);
+                const blob = new Blob([dataStr], { type: 'application/json' });
+                downloadBlob(blob, `filtered_results_${timestamp}.json`);
+            } else if (format === 'csv') {
+                const headers = Object.keys(filteredResults[0]);
+                const csv = [
+                    headers.join(','),
+                    ...filteredResults.map(row => 
+                        headers.map(header => 
+                            JSON.stringify(row[header] || '')
+                        ).join(',')
+                    )
+                ].join('\n');
+                
+                const blob = new Blob([csv], { type: 'text/csv' });
+                downloadBlob(blob, `filtered_results_${timestamp}.csv`);
+            }
+        }
+        
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+        
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+        
+        // Event listeners for filters
+        document.getElementById('labelFilter').addEventListener('change', applyFilters);
+        document.getElementById('modelFilter').addEventListener('change', applyFilters);
+        document.getElementById('searchInput').addEventListener('input', applyFilters);
+    </script>
+
+ -->
+
+
+
+
+
+ -->
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+<!-- AUTOLOAD_JSON_PATH -->
+<script>
+window.addEventListener('load', () => {
+  const jsonPath = "/data/results/results_20251120_003721.json";
+  console.log("Attempting to fetch:", jsonPath);
+  fetch(jsonPath)
+    .then(resp => {
+      if (!resp.ok) throw new Error('HTTP ' + resp.status);
+      return resp.json();
+    })
+    .then(data => {
+      window.allResults = data;
+      console.log("✅ Loaded " + data.length + " results");
+      if (typeof updateStats === 'function') updateStats();
+      if (typeof updateModelFilter === 'function') updateModelFilter();
+      if (typeof applyFilters === 'function') applyFilters();
+    })
+    .catch(err => {
+      console.error("Auto-load failed:", err);
+      alert("⚠️ Auto-load failed. Please use 'Choose File' to load manually.\nTried: " + jsonPath);
+    });
+});
+</script>
+
+</body>
+</html>
