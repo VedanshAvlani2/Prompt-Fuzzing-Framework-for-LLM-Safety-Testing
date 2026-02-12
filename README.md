@@ -32,7 +32,7 @@ It provides a **secure sandbox**, **automated detectors**, and a **triage interf
    - Includes filtering, search, and export capabilities.
 
 4. **Documentation Package**  
-   - `README.md`, `threat_model.md`, `redaction_policy.md`, and `reproduce_steps.md`.
+   - `README.md`
 
 5. **Labeled Evaluation Slice**  
    - Manually annotated subset to evaluate detection accuracy (precision/recall).
