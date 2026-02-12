@@ -1,7 +1,6 @@
 # adapters/api_adapter.py
 """
 Groq API Adapter (with embedded API key + model fallback).
-For local/private testing only — do NOT push to public repos.
 """
 
 import time
@@ -16,7 +15,7 @@ LOG = logging.getLogger(__name__)
 class ApiAdapter:
     def __init__(self, model_candidates=None):
         # ✅ Embed your Groq API key directly here
-        self.api_key = "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"
+        self.api_key = ""
 
         # Initialize Groq client
         if not self.api_key or not self.api_key.startswith("gsk_"):
@@ -83,4 +82,5 @@ class ApiAdapter:
             "model": None,
             "text": "[Error contacting Groq — please check API key or limits]",
             "status": "error",
+
         }
